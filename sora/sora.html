@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>索拉生日翻翻樂</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1d1b2e; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { max-width: 100vw; max-height: 100vh; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+</head>
+<body>
+<script>
+const W = 720, H = 960;
+const COLS = 4, ROWS = 6, CARD = 118, GAP = 14;
+const TIME_LIMIT = 60; // 60 秒內全部配對才算成功
+const NAMES = ['', '好餓索拉', '好冰索拉', '摸魚索拉', '生日索拉', '好鹹索拉', '緩慢索拉',
+  '讚讚索拉', '好吃索拉', '貓貓索拉', '作者俐文', '迪士尼索拉', '次女索拉'];
+const FONT ='"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+
+class Game extends Phaser.Scene {
+  constructor() { super('Game'); }
+
+  preload() {
+    for (let i = 1; i <= 12; i++) this.load.image('img' + i, 'assets/' + i + '.png');
+  }
+
+  create() {
+    this.makeTextures();
+    this.add.rectangle(W / 2, H / 2, W, H, 0x2a2745);
+
+    this.add.text(W / 2, 40, '索拉生日翻翻樂', { fontFamily: FONT, fontSize: '40px', color: '#ffe9a8', fontStyle: 'bold' }).setOrigin(0.5);
+    this.infoText = this.add.text(W / 2, 95, '', { fontFamily: FONT, fontSize: '26px', color: '#ffffff' }).setOrigin(0.5);
+
+    this.startRound();
+  }
+
+  makeTextures() {
+    if (this.textures.exists('back')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x6c5ce7, 1).fillRoundedRect(0, 0, CARD, CARD, 16);
+    g.lineStyle(6, 0xffffff, 0.8).strokeRoundedRect(4, 4, CARD - 8, CARD - 8, 14);
+    g.lineStyle(3, 0xffffff, 0.35).strokeCircle(CARD / 2, CARD / 2, 30);
+    g.fillStyle(0xffffff, 0.5).fillCircle(CARD / 2, CARD / 2, 8);
+    g.generateTexture('back', CARD, CARD);
+    g.clear();
+    g.fillStyle(0xffffff, 1).fillRoundedRect(0, 0, CARD, CARD, 16);
+    g.generateTexture('front', CARD, CARD);
+    g.destroy();
+  }
+
+  startRound() {
+    if (this.cards) this.cards.forEach(c => c.container.destroy());
+    if (this.overlay) { this.overlay.destroy(true); this.overlay = null; }
+    this.cards = [];
+    this.mistakes = 0;
+    this.matched = 0;
+    this.first = null;
+    this.busy = false;
+    this.ended = false;
+    this.timeLeft = TIME_LIMIT;
+    this.timerStarted = false;
+    if (this.timer) this.timer.remove();
+    this.updateInfo();
+
+    const ids = [];
+    for (let i = 1; i <= 12; i++) ids.push(i, i);
+    Phaser.Utils.Array.Shuffle(ids);
+
+    const gridW = COLS * CARD + (COLS - 1) * GAP;
+    const x0 = (W - gridW) / 2 + CARD / 2;
+    const y0 = 150 + CARD / 2;
+
+    ids.forEach((id, n) => {
+      const x = x0 + (n % COLS) * (CARD + GAP);
+      const y = y0 + Math.floor(n / COLS) * (CARD + GAP);
+      const back = this.add.image(0, 0, 'back');
+      const face = this.add.container(0, 0, [
+        this.add.image(0, 0, 'front'),
+        this.add.image(0, 0, 'img' + id).setDisplaySize(CARD - 12, CARD - 12)
+      ]).setVisible(false);
+      const label = this.add.container(0, CARD / 2 - 14, [
+        this.add.rectangle(0, 0, CARD - 12, 24, 0x000000, 0.7),
+        this.add.text(0, 0, NAMES[id], { fontFamily: FONT, fontSize: '16px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5)
+      ]).setVisible(false);
+      face.add(label);
+      const container = this.add.container(x, y, [back, face]).setSize(CARD, CARD);
+      container.setInteractive({ useHandCursor: true });
+      const card = { id, container, back, face, label, open: false, done: false };
+      container.on('pointerdown', () => this.onPick(card));
+      container.on('pointerover', () => { if (!card.open && !card.done) container.setScale(1.05); });
+      container.on('pointerout', () => container.setScale(1));
+      this.cards.push(card);
+    });
+  }
+
+  updateInfo() {
+    this.infoText.setText(`⏱ ${this.timeLeft} 秒　已配對：${this.matched}/12　失誤：${this.mistakes}`);
+    this.infoText.setColor(this.timeLeft <= 10 ? '#ff8f8f' : '#ffffff');
+  }
+
+  startTimer() {
+    this.timerStarted = true;
+    this.timer = this.time.addEvent({
+      delay: 1000, loop: true,
+      callback: () => {
+        if (this.ended) return;
+        this.timeLeft--;
+        this.updateInfo();
+        if (this.timeLeft <= 0) this.finish(false);
+      }
+    });
+  }
+
+  flip(card, toOpen, cb) {
+    card.open = toOpen;
+    this.tweens.add({
+      targets: card.container, scaleX: 0, duration: 120,
+      onComplete: () => {
+        card.back.setVisible(!toOpen);
+        card.face.setVisible(toOpen);
+        this.tweens.add({ targets: card.container, scaleX: 1, duration: 120, onComplete: cb });
+      }
+    });
+  }
+
+  onPick(card) {
+    if (this.busy || this.ended || card.open || card.done) return;
+    card.container.setScale(1);
+    if (!this.timerStarted) this.startTimer();
+
+    if (!this.first) {
+      this.first = card;
+      this.flip(card, true);
+      return;
+    }
+
+    const a = this.first, b = card;
+    this.first = null;
+    this.busy = true;
+    this.flip(b, true, () => {
+      if (a.id === b.id) {
+        a.done = b.done = true;
+        a.label.setVisible(true); b.label.setVisible(true);
+        this.matched++;
+        this.updateInfo();
+        [a, b].forEach(c => this.tweens.add({ targets: c.container, scale: 1.12, yoyo: true, duration: 150 }));
+        this.time.delayedCall(300, () => {
+          [a, b].forEach(c => this.tweens.add({ targets: c.container, alpha: 0.85, duration: 200 }));
+          this.busy = false;
+          if (this.matched === 12) this.finish(true);
+        });
+      } else {
+        this.mistakes++;
+        this.updateInfo();
+        this.cameras.main.shake(150, 0.004);
+        this.time.delayedCall(700, () => {
+          this.flip(a, false);
+          this.flip(b, false, () => {
+            this.busy = false;
+          });
+        });
+      }
+    });
+  }
+
+  finish(win) {
+    if (this.ended) return;
+    this.ended = true;
+    if (this.timer) this.timer.remove();
+    this.time.delayedCall(win ? 400 : 100, () => {
+      const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setInteractive();
+      const title = this.add.text(W / 2, H / 2 - 90, win ? '🎉 挑戰成功！' : '💔 挑戰失敗', {
+        fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: win ? '#9dffb0' : '#ff8f8f'
+      }).setOrigin(0.5);
+      const sub = this.add.text(W / 2, H / 2 - 10,
+        win ? `用時 ${TIME_LIMIT - this.timeLeft} 秒，全部配對完成！\n截圖找俐文拿禮物！` : '時間到，還沒配對完…', {
+        fontFamily: FONT, fontSize: '30px', color: '#ffffff', align: 'center', lineSpacing: 8
+      }).setOrigin(0.5);
+      const btn = this.add.text(W / 2, H / 2 + 90, '再玩一次', {
+        fontFamily: FONT, fontSize: '36px', color: '#ffffff', backgroundColor: '#6c5ce7', padding: { x: 36, y: 14 }
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      btn.on('pointerdown', () => this.startRound());
+      this.overlay = this.add.container(0, 0, [dim, title, sub, btn]);
+      this.overlay.setDepth(100);
+    });
+  }
+}
+
+new Phaser.Game({
+  // 使用 Canvas 渲染並以 HTML 方式載入圖片，直接雙擊開啟 (file://) 也能運作
+  type: Phaser.CANVAS,
+  width: W, height: H,
+  backgroundColor: '#1d1b2e',
+  loader: { imageLoadType: 'HTML' },
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: Game
+});
+</script>
+</body>
+</html>
