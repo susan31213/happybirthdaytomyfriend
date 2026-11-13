@@ -2,19 +2,19 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>索拉生日翻翻樂</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #1d1b2e; }
+  html, body { margin: 0; height: 100%; overscroll-behavior: none; -webkit-user-select: none; user-select: none; background: #1d1b2e; }
   body { display: flex; align-items: center; justify-content: center; }
-  canvas { max-width: 100vw; max-height: 100vh; }
+  canvas { max-width: 100vw; max-height: 100dvh; touch-action: manipulation; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
 <body>
 <script>
-const W = 720, H = 960;
-const COLS = 4, ROWS = 6, CARD = 118, GAP = 14;
+const W = 720, H = 1280;
+const COLS = 4, ROWS = 6, CARD = 152, GAP = 20;
 const TIME_LIMIT = 60; // 60 秒內全部配對才算成功
 const NAMES = ['', '好餓索拉', '好冰索拉', '摸魚索拉', '生日索拉', '好鹹索拉', '緩慢索拉',
   '讚讚索拉', '好吃索拉', '貓貓索拉', '作者俐文', '迪士尼索拉', '次女索拉'];
@@ -31,8 +31,8 @@ class Game extends Phaser.Scene {
     this.makeTextures();
     this.add.rectangle(W / 2, H / 2, W, H, 0x2a2745);
 
-    this.add.text(W / 2, 40, '索拉生日翻翻樂', { fontFamily: FONT, fontSize: '40px', color: '#ffe9a8', fontStyle: 'bold' }).setOrigin(0.5);
-    this.infoText = this.add.text(W / 2, 95, '', { fontFamily: FONT, fontSize: '26px', color: '#ffffff' }).setOrigin(0.5);
+    this.add.text(W / 2, 60, '索拉生日翻翻樂', { fontFamily: FONT, fontSize: '54px', color: '#ffe9a8', fontStyle: 'bold' }).setOrigin(0.5);
+    this.infoText = this.add.text(W / 2, 135, '', { fontFamily: FONT, fontSize: '30px', color: '#ffffff' }).setOrigin(0.5);
 
     this.startRound();
   }
@@ -71,7 +71,7 @@ class Game extends Phaser.Scene {
 
     const gridW = COLS * CARD + (COLS - 1) * GAP;
     const x0 = (W - gridW) / 2 + CARD / 2;
-    const y0 = 150 + CARD / 2;
+    const y0 = 190 + CARD / 2;
 
     ids.forEach((id, n) => {
       const x = x0 + (n % COLS) * (CARD + GAP);
@@ -81,9 +81,9 @@ class Game extends Phaser.Scene {
         this.add.image(0, 0, 'front'),
         this.add.image(0, 0, 'img' + id).setDisplaySize(CARD - 12, CARD - 12)
       ]).setVisible(false);
-      const label = this.add.container(0, CARD / 2 - 14, [
-        this.add.rectangle(0, 0, CARD - 12, 24, 0x000000, 0.7),
-        this.add.text(0, 0, NAMES[id], { fontFamily: FONT, fontSize: '16px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5)
+      const label = this.add.container(0, CARD / 2 - 20, [
+        this.add.rectangle(0, 0, CARD - 12, 34, 0x000000, 0.7),
+        this.add.text(0, 0, NAMES[id], { fontFamily: FONT, fontSize: '23px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5)
       ]).setVisible(false);
       face.add(label);
       const container = this.add.container(x, y, [back, face]).setSize(CARD, CARD);
@@ -173,14 +173,14 @@ class Game extends Phaser.Scene {
     this.time.delayedCall(win ? 400 : 100, () => {
       const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setInteractive();
       const title = this.add.text(W / 2, H / 2 - 90, win ? '🎉 挑戰成功！' : '💔 挑戰失敗', {
-        fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: win ? '#9dffb0' : '#ff8f8f'
+        fontFamily: FONT, fontSize: '72px', fontStyle: 'bold', color: win ? '#9dffb0' : '#ff8f8f'
       }).setOrigin(0.5);
       const sub = this.add.text(W / 2, H / 2 - 10,
         win ? `用時 ${TIME_LIMIT - this.timeLeft} 秒，全部配對完成！\n截圖找俐文拿禮物！` : '時間到，還沒配對完…', {
-        fontFamily: FONT, fontSize: '30px', color: '#ffffff', align: 'center', lineSpacing: 8
+        fontFamily: FONT, fontSize: '34px', color: '#ffffff', align: 'center', lineSpacing: 8
       }).setOrigin(0.5);
       const btn = this.add.text(W / 2, H / 2 + 90, '再玩一次', {
-        fontFamily: FONT, fontSize: '36px', color: '#ffffff', backgroundColor: '#6c5ce7', padding: { x: 36, y: 14 }
+        fontFamily: FONT, fontSize: '44px', color: '#ffffff', backgroundColor: '#6c5ce7', padding: { x: 36, y: 14 }
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       btn.on('pointerdown', () => this.startRound());
       this.overlay = this.add.container(0, 0, [dim, title, sub, btn]);
