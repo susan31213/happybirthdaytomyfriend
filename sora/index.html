@@ -24,6 +24,8 @@ class Game extends Phaser.Scene {
   constructor() { super('Game'); }
 
   preload() {
+    this.load.audio('bgm', 'bgm.mp3');
+    ['turn_card', 'paired', 'not_paired', 'clear', 'failure'].forEach(k => this.load.audio(k, 'se/' + k + '.mp3'));
     for (let i = 1; i <= 12; i++) this.load.image('img' + i, 'assets/' + i + '.png');
   }
 
@@ -61,6 +63,8 @@ class Game extends Phaser.Scene {
     this.busy = false;
     this.ended = false;
     this.timeLeft = TIME_LIMIT;
+    if (!this.bgm) this.bgm = this.sound.add('bgm', { loop: true, volume: 0.4 });
+    if (!this.bgm.isPlaying) this.bgm.play();
     this.timerStarted = false;
     if (this.timer) this.timer.remove();
     this.updateInfo();
@@ -130,6 +134,7 @@ class Game extends Phaser.Scene {
     if (this.busy || this.ended || card.open || card.done) return;
     card.container.setScale(1);
     if (!this.timerStarted) this.startTimer();
+    this.sound.play('turn_card');
 
     if (!this.first) {
       this.first = card;
@@ -144,6 +149,7 @@ class Game extends Phaser.Scene {
       if (a.id === b.id) {
         a.done = b.done = true;
         a.label.setVisible(true); b.label.setVisible(true);
+        this.sound.play('paired');
         this.matched++;
         this.updateInfo();
         [a, b].forEach(c => this.tweens.add({ targets: c.container, scale: 1.12, yoyo: true, duration: 150 }));
@@ -156,6 +162,7 @@ class Game extends Phaser.Scene {
         this.mistakes++;
         this.updateInfo();
         this.cameras.main.shake(150, 0.004);
+        this.sound.play('not_paired');
         this.time.delayedCall(700, () => {
           this.flip(a, false);
           this.flip(b, false, () => {
@@ -169,8 +176,10 @@ class Game extends Phaser.Scene {
   finish(win) {
     if (this.ended) return;
     this.ended = true;
+    if (this.bgm) this.bgm.stop();
     if (this.timer) this.timer.remove();
     this.time.delayedCall(win ? 400 : 100, () => {
+      this.sound.play(win ? 'clear' : 'failure');
       const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setInteractive();
       const title = this.add.text(W / 2, H / 2 - 90, win ? '🎉 挑戰成功！' : '💔 挑戰失敗', {
         fontFamily: FONT, fontSize: '72px', fontStyle: 'bold', color: win ? '#9dffb0' : '#ff8f8f'
